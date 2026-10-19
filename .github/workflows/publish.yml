@@ -1,0 +1,16 @@
+# Publishes to pub.dev when a version tag is pushed (for example v0.1.1). No secret is stored: GitHub proves to
+# pub.dev who it is. One-time setup on pub.dev: this package's Admin tab, Automated publishing, enable it for this
+# repository with the tag pattern v{{version}}. The version in pubspec.yaml must match the tag.
+name: Publish to pub.dev
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+jobs:
+  publish:
+    permissions:
+      id-token: write # lets GitHub authenticate to pub.dev
+    uses: dart-lang/ecosystem/.github/workflows/publish.yaml@main
+    with:
+      use-flutter: true
