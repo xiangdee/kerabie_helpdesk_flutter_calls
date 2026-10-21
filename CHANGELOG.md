@@ -1,3 +1,7 @@
+## 0.1.1
+
+- Works with kerabie_helpdesk_flutter 0.2.0.
+
 ## 0.1.0
 
 - First release: `KerabieCallButton`, `KerabieCallScreen` and `KerabieCallController`.
