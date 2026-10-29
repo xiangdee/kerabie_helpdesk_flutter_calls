@@ -7,7 +7,13 @@ import 'call_screen.dart';
 /// A "Call us" button and the call screen it opens. Renders nothing when calls are off in the dashboard or the plan
 /// has no minutes left, so it is safe to leave in your layout. Needs a [KerabieProvider] above it.
 class KerabieCallButton extends StatefulWidget {
-  const KerabieCallButton({super.key, this.video = false, this.label = 'Call us'});
+  const KerabieCallButton({super.key, this.video = false, this.label = 'Call us'}) : icon = false;
+
+  /// Compact phone (and camera, when video is on) icons for the chat header. Pass it to
+  /// `KerabieProvider(callActions: KerabieCallButton.icon())`.
+  const KerabieCallButton.icon({super.key}) : icon = true, video = false, label = 'Call us';
+
+  final bool icon;
 
   /// Start with the camera on. Only used when the dashboard allows video.
   final bool video;
@@ -65,6 +71,27 @@ class _KerabieCallButtonState extends State<KerabieCallButton> {
       listenable: Listenable.merge([chat, call]),
       builder: (context, _) {
         if (!call.available) return const SizedBox.shrink();
+        if (widget.icon) {
+          final idle = call.phase == KerabieCallPhase.idle;
+          void begin(bool video) {
+            call.start(video: video);
+            _openScreen();
+          }
+
+          return Row(mainAxisSize: MainAxisSize.min, children: [
+            IconButton(
+              tooltip: 'Call us',
+              onPressed: idle ? () => begin(false) : null,
+              icon: Icon(Icons.call_outlined, size: 20, color: palette.onPrimary),
+            ),
+            if (call.videoAvailable)
+              IconButton(
+                tooltip: 'Video call',
+                onPressed: idle ? () => begin(true) : null,
+                icon: Icon(Icons.videocam_outlined, size: 22, color: palette.onPrimary),
+              ),
+          ]);
+        }
         return FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: palette.primary,

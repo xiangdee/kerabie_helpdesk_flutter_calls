@@ -12,7 +12,7 @@ Calls are a separate package so apps that only want chat do not carry the WebRTC
 ## Before you start
 
 - Chat set up with `kerabie_helpdesk_flutter` (a `KerabieProvider` above your app).
-- Calls turned on in the dashboard under Settings, Widget, Calls, and call minutes on your plan.
+- Calls turned on in the dashboard under Settings, Calls, and call minutes on your plan.
 
 ## Install
 
@@ -59,6 +59,16 @@ const KerabieCallButton(label: 'Call us'),
 const KerabieCallButton(label: 'Video call', video: true),
 ```
 
+To put call buttons in the chat header itself, pass the icon variant to the provider. It is a widget you pass in, so the main package never carries the call code:
+
+```dart
+KerabieProvider(
+  config: ...,
+  callActions: const KerabieCallButton.icon(),
+  child: ...,
+)
+```
+
 The button opens a call screen with the queue position, ringing, the call itself and how it ended.
 
 ## Your own button
@@ -87,6 +97,8 @@ if (call.available) {
 Call `dispose()` on a controller you create yourself.
 
 ## How a call is handled
+
+If you ask customers for their details before a chat (the pre-chat form in the dashboard), the call asks the same questions first, once. Pass `user` in `KerabieConfig`, or call `setUser` after login, and a customer you have identified is never asked. On a video call the customer sees the agent, with their own camera as a small picture in the corner.
 
 A call goes to every free agent at once. When nobody is free the AI voice agent answers if you turned it on; otherwise the customer waits in the queue, and the call is marked missed after two minutes. Calls with a person and calls the AI answers are limited separately by your plan.
 

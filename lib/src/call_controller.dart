@@ -14,6 +14,10 @@ abstract class KerabieCallChat {
   Future<KerabieCallJoin?> currentCall();
   Future<void> endCall(int callId);
   Stream<KerabieCallEvent> get callEvents;
+
+  /// The organisation asks for details before a chat, and this visitor has not given any yet.
+  bool get needsDetails;
+  void submitDetails(Map<String, String> answers);
 }
 
 /// Reads the calls settings from a [KerabieController].
@@ -34,10 +38,17 @@ class KerabieControllerCalls implements KerabieCallChat {
   Future<void> endCall(int callId) => controller.endCall(callId);
   @override
   Stream<KerabieCallEvent> get callEvents => controller.callEvents;
+  @override
+  bool get needsDetails => controller.needsPreChatDetails;
+  @override
+  void submitDetails(Map<String, String> answers) => controller.submitPreChat(answers);
 }
 
 enum KerabieCallPhase {
   idle,
+
+  /// The organisation asks for the pre-chat details first (the same form as the chat).
+  details,
 
   /// Asking Kerabie to start the call.
   starting,
@@ -105,12 +116,33 @@ class KerabieCallController extends ChangeNotifier {
   bool get microphoneOn => _media.microphoneOn;
   bool get cameraOn => _media.cameraOn;
   VideoTrack? get remoteVideo => _media.remoteVideo;
+  VideoTrack? get localVideo => _media.localVideo;
 
   /// Starts a call. A visitor who already has one is put back into it.
   Future<void> start({bool video = false}) async {
     if (!available || _phase != KerabieCallPhase.idle) return;
-    _reset(KerabieCallPhase.starting);
     _video = video && videoAvailable;
+    // The organisation asks every visitor for details before a chat. A call asks the same, once.
+    if (_chat.needsDetails) {
+      _reset(KerabieCallPhase.details);
+      _video = video && videoAvailable;
+      _notify();
+      return;
+    }
+    await _place();
+  }
+
+  /// The details were filled in: save them and place the call the visitor asked for.
+  Future<void> submitDetails(Map<String, String> answers) async {
+    if (_phase != KerabieCallPhase.details) return;
+    _chat.submitDetails(answers);
+    await _place();
+  }
+
+  Future<void> _place() async {
+    final video = _video;
+    _reset(KerabieCallPhase.starting);
+    _video = video;
     _notify();
     try {
       final join = await _chat.startCall(video: _video);
@@ -142,6 +174,12 @@ class KerabieCallController extends ChangeNotifier {
   Future<void> hangUp() async {
     final id = _callId;
     if (_phase == KerabieCallPhase.idle || _phase == KerabieCallPhase.ended) return;
+    // Nothing has been placed yet: just close the screen.
+    if (_phase == KerabieCallPhase.details) {
+      _reset(KerabieCallPhase.idle);
+      _notify();
+      return;
+    }
     final wasConnected = _phase == KerabieCallPhase.connected;
     await _finish(wasConnected ? 'hangup' : 'cancelled');
     if (id != null) {

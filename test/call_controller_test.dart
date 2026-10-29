@@ -40,6 +40,38 @@ void main() {
     });
   });
 
+  group('pre-chat details', () {
+    test('asks for them before placing the call', () async {
+      chat.needsDetails = true;
+      await call.start(video: true);
+      expect(call.phase, KerabieCallPhase.details);
+      expect(chat.startCalls, isEmpty);
+    });
+
+    test('places the call, with the video choice kept, once they are filled in', () async {
+      chat.needsDetails = true;
+      await call.start(video: true);
+      await call.submitDetails({'name': 'Ada'});
+      expect(chat.submitted, [{'name': 'Ada'}]);
+      expect(chat.startCalls, [true]);
+      expect(call.phase, isNot(KerabieCallPhase.details));
+    });
+
+    test('closes without a call when cancelled', () async {
+      chat.needsDetails = true;
+      await call.start();
+      await call.hangUp();
+      expect(call.phase, KerabieCallPhase.idle);
+      expect(chat.startCalls, isEmpty);
+      expect(chat.ended, isEmpty);
+    });
+
+    test('does not ask again once details are known', () async {
+      await call.start();
+      expect(chat.startCalls, hasLength(1));
+    });
+  });
+
   group('starting', () {
     test('the AI answers at once: joins the room and is connected', () async {
       chat.onStart = (_) async => join(status: 'ACTIVE', handler: 'AI');

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:kerabie_helpdesk_flutter/kerabie_helpdesk_flutter.dart';
-import 'package:livekit_client/livekit_client.dart' show VideoTrackRenderer, VideoViewFit;
+import 'package:livekit_client/livekit_client.dart' show VideoTrackRenderer, VideoViewFit, VideoViewMirrorMode;
 
 import 'call_controller.dart';
 
@@ -110,13 +110,41 @@ class _KerabieCallScreenState extends State<KerabieCallScreen> {
       case KerabieCallPhase.connected:
         final who = call.handler == 'AI' ? 'AI assistant' : (call.agentName ?? 'Support');
         final video = call.remoteVideo;
+        final self = call.localVideo;
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (call.video && video != null)
+            if (call.video && (video != null || self != null))
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: AspectRatio(aspectRatio: 3 / 4, child: VideoTrackRenderer(video, fit: VideoViewFit.cover)),
+                child: AspectRatio(
+                  aspectRatio: 3 / 4,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      const ColoredBox(color: Colors.black),
+                      if (video != null) VideoTrackRenderer(video, fit: VideoViewFit.cover),
+                      // Your own camera, small, in the corner
+                      if (self != null && call.cameraOn)
+                        Positioned(
+                          right: 12,
+                          bottom: 12,
+                          width: 92,
+                          height: 124,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 2),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: VideoTrackRenderer(self, fit: VideoViewFit.cover, mirrorMode: VideoViewMirrorMode.mirror),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               )
             else
               CircleAvatar(
@@ -134,6 +162,17 @@ class _KerabieCallScreenState extends State<KerabieCallScreen> {
       case KerabieCallPhase.ended:
         final text = call.error ?? _endedText[call.endReason ?? 'hangup'] ?? 'Call ended';
         return Text(text, textAlign: TextAlign.center, style: strong());
+      case KerabieCallPhase.details:
+        return KerabiePreChatForm(
+          fields: widget.chat.preChatFields,
+          title: 'Before we call',
+          subtitle: 'Share your details so we can follow up',
+          submitLabel: 'Start call',
+          requireContact: identical(widget.chat.preChatFields, kerabieDefaultPreChatFields),
+          initial: {'name': widget.chat.currentUser?.name ?? '', 'email': widget.chat.currentUser?.email ?? ''},
+          palette: palette,
+          onSubmit: call.submitDetails,
+        );
       case KerabieCallPhase.idle:
       case KerabieCallPhase.starting:
       case KerabieCallPhase.waiting:

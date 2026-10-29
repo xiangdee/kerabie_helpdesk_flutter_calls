@@ -28,12 +28,21 @@ class FakeChat implements KerabieCallChat {
   KerabieCallJoin? current;
   Object? currentError;
   Object? endError;
+  @override
+  bool needsDetails = false;
+  final submitted = <Map<String, String>>[];
   final startCalls = <bool>[];
   final ended = <int>[];
   final _events = StreamController<KerabieCallEvent>.broadcast(sync: true);
 
   @override
   Stream<KerabieCallEvent> get callEvents => _events.stream;
+
+  @override
+  void submitDetails(Map<String, String> answers) {
+    submitted.add(answers);
+    needsDetails = false;
+  }
 
   @override
   Future<KerabieCallJoin> startCall({bool video = false}) {
@@ -93,6 +102,9 @@ class FakeMedia extends KerabieCallMedia {
 
   @override
   VideoTrack? get remoteVideo => null;
+
+  @override
+  VideoTrack? get localVideo => null;
   @override
   bool get microphoneOn => _mic;
   @override

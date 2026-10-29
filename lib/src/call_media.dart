@@ -13,6 +13,9 @@ abstract class KerabieCallMedia {
   /// The other side's video, when there is one.
   VideoTrack? get remoteVideo;
 
+  /// Your own camera, when it is on, shown small over the other side's video.
+  VideoTrack? get localVideo;
+
   bool get microphoneOn;
   bool get cameraOn;
 
@@ -35,6 +38,15 @@ class LiveKitCallMedia extends KerabieCallMedia {
   VideoTrack? get remoteVideo => _remoteVideo;
 
   @override
+  VideoTrack? get localVideo {
+    for (final pub in _room?.localParticipant?.videoTrackPublications ?? const <LocalTrackPublication<LocalVideoTrack>>[]) {
+      final track = pub.track;
+      if (track != null && !pub.muted) return track;
+    }
+    return null;
+  }
+
+  @override
   bool get microphoneOn => _room?.localParticipant?.isMicrophoneEnabled() ?? false;
 
   @override
@@ -53,6 +65,8 @@ class LiveKitCallMedia extends KerabieCallMedia {
         if (e.track == _remoteVideo) _remoteVideo = null;
         onChanged?.call();
       })
+      ..on<LocalTrackPublishedEvent>((_) => onChanged?.call())
+      ..on<LocalTrackUnpublishedEvent>((_) => onChanged?.call())
       ..on<RoomDisconnectedEvent>((_) {
         if (_room == room) onDisconnected?.call();
       });
