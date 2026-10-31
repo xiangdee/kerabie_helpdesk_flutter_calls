@@ -389,4 +389,64 @@ void main() {
     chat.emit('ended');
     await pump();
   });
+
+  group('the AI agent', () {
+    late KerabieCallController agent;
+    tearDown(() => agent.dispose());
+
+    KerabieCallController make(KerabieAgentOptions options) => agent = KerabieCallController.forChat(chat, media: media, agent: options);
+
+    test('sends the signed-in customer's token and the screens the app can show', () async {
+      make(KerabieAgentOptions(getUserToken: () async => 'jwt-abc', screens: {'confirm_action': (_) async => 'yes', 'pick_schedule': (_) async => 'x'}));
+      await agent.start();
+      expect(chat.startTokens.single, 'jwt-abc');
+      expect(chat.startTools.single, ['confirm_action', 'pick_schedule']);
+    });
+
+    test('sends no token when nobody is signed in, and when the token cannot be read', () async {
+      make(KerabieAgentOptions(getUserToken: () async => null, screens: const {}));
+      await agent.start();
+      expect(chat.startTokens.single, isNull);
+      agent.dispose();
+      chat.startTokens.clear();
+      make(KerabieAgentOptions(getUserToken: () => throw StateError('storage'), screens: const {}));
+      await agent.start();
+      expect(chat.startTokens.single, isNull);
+    });
+
+    test('hands the screens to the room when the call connects', () async {
+      chat.onStart = (_) async => join(status: 'ACTIVE', handler: 'AI');
+      make(KerabieAgentOptions(screens: {'confirm_action': (_) async => 'yes'}));
+      await agent.start();
+      expect(media.joinedScreens.keys, ['confirm_action']);
+    });
+
+    test('describes the app\'s actions to the server and hands them to the room', () async {
+      chat.onStart = (_) async => join(status: 'ACTIVE', handler: 'AI');
+      make(KerabieAgentOptions(actions: {
+        'add_to_cart': KerabieAgentAction(
+          description: 'Adds an item to the cart in the app',
+          parameters: const {'type': 'object', 'properties': {'itemId': {'type': 'string'}}},
+          run: (args) async => 'added',
+        ),
+      }));
+      await agent.start();
+      expect(chat.startActions.single, [
+        {
+          'name': 'add_to_cart',
+          'description': 'Adds an item to the cart in the app',
+          'parameters': {'type': 'object', 'properties': {'itemId': {'type': 'string'}}},
+        },
+      ]);
+      expect(media.joinedActions.keys, ['add_to_cart']);
+      expect(await media.joinedActions['add_to_cart']!.run({}), 'added');
+    });
+
+    test('a plain call sends no token and no screens', () async {
+      await call.start();
+      expect(chat.startTokens.single, isNull);
+      expect(chat.startTools.single, isEmpty);
+      expect(chat.startActions.single, isEmpty);
+    });
+  });
 }

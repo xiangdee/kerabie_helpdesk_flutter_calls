@@ -4,13 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:kerabie_helpdesk_flutter/kerabie_helpdesk_flutter.dart';
 import 'package:livekit_client/livekit_client.dart' show VideoTrack;
 
+import 'agent_options.dart';
 import 'call_media.dart';
 
 /// What the call controller needs from the chat. [KerabieController] is the real one; tests use a fake.
 abstract class KerabieCallChat {
   bool get callsEnabled;
   bool get videoEnabled;
-  Future<KerabieCallJoin> startCall({bool video});
+  Future<KerabieCallJoin> startCall({bool video, String? userToken, List<String> uiTools, List<Map<String, dynamic>> appActions});
   Future<KerabieCallJoin?> currentCall();
   Future<void> endCall(int callId);
   Stream<KerabieCallEvent> get callEvents;
@@ -31,7 +32,8 @@ class KerabieControllerCalls implements KerabieCallChat {
   @override
   bool get videoEnabled => controller.settings.videoCallsEnabled;
   @override
-  Future<KerabieCallJoin> startCall({bool video = false}) => controller.startCall(video: video);
+  Future<KerabieCallJoin> startCall({bool video = false, String? userToken, List<String> uiTools = const [], List<Map<String, dynamic>> appActions = const []}) =>
+      controller.startCall(video: video, userToken: userToken, uiTools: uiTools, appActions: appActions);
   @override
   Future<KerabieCallJoin?> currentCall() => controller.currentCall();
   @override
@@ -68,14 +70,17 @@ enum KerabieCallPhase {
 
 /// One call at a time: start it, follow it, hang up. Rebuilds listeners when anything changes.
 class KerabieCallController extends ChangeNotifier {
-  KerabieCallController(KerabieController chat, {KerabieCallMedia? media})
-      : this.forChat(KerabieControllerCalls(chat), media: media);
+  KerabieCallController(KerabieController chat, {KerabieCallMedia? media, this.agent})
+      : this.forChat(KerabieControllerCalls(chat), media: media, agent: agent);
 
-  KerabieCallController.forChat(this._chat, {KerabieCallMedia? media}) : _media = media ?? LiveKitCallMedia() {
+  KerabieCallController.forChat(this._chat, {KerabieCallMedia? media, this.agent}) : _media = media ?? LiveKitCallMedia() {
     _media.onChanged = _notify;
     _media.onDisconnected = () => _finish('connection_lost');
     _events = _chat.callEvents.listen(_onEvent);
   }
+
+  /// Set when this is the AI agent: the customer's token and the screens the app can show. Null for a plain call.
+  final KerabieAgentOptions? agent;
 
   final KerabieCallChat _chat;
   final KerabieCallMedia _media;
@@ -145,7 +150,13 @@ class KerabieCallController extends ChangeNotifier {
     _video = video;
     _notify();
     try {
-      final join = await _chat.startCall(video: _video);
+      final agent = this.agent;
+      final join = await _chat.startCall(
+        video: _video,
+        userToken: agent == null ? null : await agent.readUserToken(),
+        uiTools: agent == null ? const [] : agent.screens.keys.toList(),
+        appActions: agent == null ? const [] : agent.describeActions(),
+      );
       // The call can end (the visitor cancels, nobody is free) before the reply to this request arrives.
       if (_phase != KerabieCallPhase.starting) return;
       await _apply(join);
@@ -251,7 +262,7 @@ class KerabieCallController extends ChangeNotifier {
     if (join == null || _joining || _phase == KerabieCallPhase.connected) return;
     _joining = true;
     try {
-      await _media.join(url: join.livekitUrl, token: join.livekitToken, video: _video);
+      await _media.join(url: join.livekitUrl, token: join.livekitToken, video: _video, screens: agent?.screens ?? const {}, actions: agent?.actions ?? const {});
       if (_disposed || _phase == KerabieCallPhase.ended) {
         await _media.leave();
         return;

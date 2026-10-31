@@ -1,3 +1,9 @@
+## 0.3.0
+
+- `KerabieAgentButton`: the AI voice agent for your app. It uses your tools as the signed-in customer (`getUserToken`) and asks your app to show screens (`screens`) instead of reading lists aloud. A list, a confirmation and an address box are built in; add `pick_saved_address`, `pick_schedule` and `open_screen` yourself. The agent is called "Kerabie Agent" unless you pass `name`.
+- `KerabieCallController` takes `agent: KerabieAgentOptions(...)` for your own design.
+- Needs `kerabie_helpdesk_flutter` 0.5.0 and `livekit_client` 2.13 or newer.
+
 ## 0.2.0
 
 - `KerabieCallButton.icon()`: a phone (and a camera when video is on) for the chat header. Pass it to `KerabieProvider(callActions: ...)`.

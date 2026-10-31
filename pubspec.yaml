@@ -1,6 +1,6 @@
 ﻿name: kerabie_helpdesk_flutter_calls
 description: Voice and video calls for the Kerabie help desk in a Flutter app. A call button and a call screen on top of kerabie_helpdesk_flutter.
-version: 0.2.0
+version: 0.3.0
 homepage: https://kerabie.com/sdks/flutter
 repository: https://github.com/xiangdee/kerabie_helpdesk_flutter_calls
 issue_tracker: https://github.com/xiangdee/kerabie_helpdesk_flutter_calls/issues
@@ -18,8 +18,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  kerabie_helpdesk_flutter: ^0.4.0
-  livekit_client: ^2.0.0
+  kerabie_helpdesk_flutter: ^0.5.0
+  livekit_client: ^2.13.0
 
 dev_dependencies:
   flutter_lints: ^4.0.0

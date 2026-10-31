@@ -22,7 +22,10 @@ String _clock(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
 /// The call screen: waiting, ringing, the call itself, and how it ended. It closes itself when the call is dismissed.
 /// [KerabieCallButton] opens it for you; open it yourself with [KerabieCallController.start] for your own button.
 class KerabieCallScreen extends StatefulWidget {
-  const KerabieCallScreen({super.key, required this.call, required this.chat});
+  const KerabieCallScreen({super.key, required this.call, required this.chat, this.aiName = 'AI assistant'});
+
+  /// What the AI is called on screen.
+  final String aiName;
 
   final KerabieCallController call;
   final KerabieController chat;
@@ -108,7 +111,7 @@ class _KerabieCallScreenState extends State<KerabieCallScreen> {
 
     switch (call.phase) {
       case KerabieCallPhase.connected:
-        final who = call.handler == 'AI' ? 'AI assistant' : (call.agentName ?? 'Support');
+        final who = call.handler == 'AI' ? widget.aiName : (call.agentName ?? 'Support');
         final video = call.remoteVideo;
         final self = call.localVideo;
         return Column(

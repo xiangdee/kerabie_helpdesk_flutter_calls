@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:kerabie_helpdesk_flutter/kerabie_helpdesk_flutter.dart';
+import 'package:kerabie_helpdesk_flutter_calls/src/agent_options.dart';
 import 'package:kerabie_helpdesk_flutter_calls/src/call_controller.dart';
 import 'package:kerabie_helpdesk_flutter_calls/src/call_media.dart';
 import 'package:livekit_client/livekit_client.dart' show VideoTrack;
@@ -32,6 +33,9 @@ class FakeChat implements KerabieCallChat {
   bool needsDetails = false;
   final submitted = <Map<String, String>>[];
   final startCalls = <bool>[];
+  final startTokens = <String?>[];
+  final startTools = <List<String>>[];
+  final startActions = <List<Map<String, dynamic>>>[];
   final ended = <int>[];
   final _events = StreamController<KerabieCallEvent>.broadcast(sync: true);
 
@@ -45,8 +49,11 @@ class FakeChat implements KerabieCallChat {
   }
 
   @override
-  Future<KerabieCallJoin> startCall({bool video = false}) {
+  Future<KerabieCallJoin> startCall({bool video = false, String? userToken, List<String> uiTools = const [], List<Map<String, dynamic>> appActions = const []}) {
     startCalls.add(video);
+    startTokens.add(userToken);
+    startTools.add(uiTools);
+    startActions.add(appActions);
     return (onStart ?? (v) async => join(video: v))(video);
   }
 
@@ -71,15 +78,19 @@ class FakeChat implements KerabieCallChat {
 class FakeMedia extends KerabieCallMedia {
   final joins = <({String url, String token, bool video})>[];
   int leaves = 0;
+  Map<String, KerabieScreenHandler> joinedScreens = const {};
+  Map<String, KerabieAgentAction> joinedActions = const {};
   Object? joinError;
   bool _mic = true;
   bool _camera = false;
   Object? cameraError;
 
   @override
-  Future<void> join({required String url, required String token, required bool video}) async {
+  Future<void> join({required String url, required String token, required bool video, Map<String, KerabieScreenHandler> screens = const {}, Map<String, KerabieAgentAction> actions = const {}}) async {
     if (joinError != null) throw joinError!;
     joins.add((url: url, token: token, video: video));
+    joinedScreens = screens;
+    joinedActions = actions;
     _mic = true;
     _camera = video;
   }

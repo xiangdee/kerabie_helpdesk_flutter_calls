@@ -1,10 +1,18 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
+
+import 'agent_options.dart';
 
 /// The audio and video side of a call. [LiveKitCallMedia] is the real one; tests use a fake.
 abstract class KerabieCallMedia {
   /// Joins the call's room with the pass the server gave. Starts the microphone, and the camera when [video] is true.
-  Future<void> join({required String url, required String token, required bool video});
+  ///
+  /// [screens] are the app's screens the AI agent may ask for. Each is answered through an RPC named `kerabie.ui.<name>`.
+  ///
+  /// [actions] are what the app can do for the agent on the device, answered through an RPC named `kerabie.action.<name>`.
+  Future<void> join({required String url, required String token, required bool video, Map<String, KerabieScreenHandler> screens = const {}, Map<String, KerabieAgentAction> actions = const {}});
 
   Future<void> leave();
   Future<void> setMicrophone(bool on);
@@ -53,7 +61,7 @@ class LiveKitCallMedia extends KerabieCallMedia {
   bool get cameraOn => _room?.localParticipant?.isCameraEnabled() ?? false;
 
   @override
-  Future<void> join({required String url, required String token, required bool video}) async {
+  Future<void> join({required String url, required String token, required bool video, Map<String, KerabieScreenHandler> screens = const {}, Map<String, KerabieAgentAction> actions = const {}}) async {
     final room = Room(roomOptions: const RoomOptions(adaptiveStream: true, dynacast: true));
     _room = room;
     _listener = room.createListener()
@@ -70,6 +78,33 @@ class LiveKitCallMedia extends KerabieCallMedia {
       ..on<RoomDisconnectedEvent>((_) {
         if (_room == room) onDisconnected?.call();
       });
+
+    // The AI agent asks the app to show a screen (a picker, a confirmation) and waits for what the customer chose.
+    screens.forEach((name, handler) {
+      room.registerRpcMethod('kerabie.ui.$name', (data) async {
+        var payload = <String, dynamic>{};
+        try {
+          final decoded = jsonDecode(data.payload);
+          if (decoded is Map) payload = Map<String, dynamic>.from(decoded);
+        } catch (_) {
+          // An unreadable request is treated as empty.
+        }
+        return handler(payload);
+      });
+    });
+
+    actions.forEach((name, action) {
+      room.registerRpcMethod('kerabie.action.$name', (data) async {
+        var args = <String, dynamic>{};
+        try {
+          final decoded = jsonDecode(data.payload);
+          if (decoded is Map) args = Map<String, dynamic>.from(decoded);
+        } catch (_) {
+          // An unreadable request is treated as empty.
+        }
+        return action.run(args);
+      });
+    });
 
     await room.connect(url, token);
     await room.localParticipant?.setMicrophoneEnabled(true);

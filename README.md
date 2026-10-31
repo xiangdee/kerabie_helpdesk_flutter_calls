@@ -96,6 +96,29 @@ if (call.available) {
 
 Call `dispose()` on a controller you create yourself.
 
+## AI agent for your app
+
+A voice agent inside your app that uses your tools as the signed-in customer, shows screens instead of reading lists, and hands over to your team with a summary. Read [AI agent for your app](https://kerabie.com/docs/ai/app-agent) for how tools, secure routes and screens work. It needs the same setup as calls: calls and the AI voice agent turned on in the dashboard, and the microphone permission.
+
+```dart
+import 'package:kerabie_helpdesk_flutter_calls/kerabie_helpdesk_flutter_calls.dart';
+
+KerabieAgentButton(
+  name: 'Kerabie Agent', // optional, shown on the button and the call screen
+  getUserToken: () async => auth.currentToken, // null when nobody is signed in
+  screens: {
+    // Screens that need your data or your design. A list, a confirmation and an address box are built in.
+    'pick_saved_address': (payload) async => pickAddress(payload['purpose']),  // the address id, or 'none' to type a new one
+    'pick_schedule': (payload) async => pickDateTime(),                        // ISO 8601 date and time
+    'open_screen': (payload) async { openScreen(payload['screen']); return 'opened'; },
+  },
+)
+```
+
+To let the agent do things in the app itself, such as adding to its own cart, pass `actions: {'add_to_cart': KerabieAgentAction(description: ..., parameters: {...}, run: (args) async => ...)}`. Each becomes a tool named `action_<name>`.
+
+Each handler shows your screen and returns the customer's answer, which the agent reads back. Throw if the customer closes it. The agent only uses the screens you list. Addresses are never taken by voice. For your own design pass `KerabieAgentOptions(getUserToken:, screens:)` as `agent:` to `KerabieCallController`.
+
 ## How a call is handled
 
 If you ask customers for their details before a chat (the pre-chat form in the dashboard), the call asks the same questions first, once. Pass `user` in `KerabieConfig`, or call `setUser` after login, and a customer you have identified is never asked. On a video call the customer sees the agent, with their own camera as a small picture in the corner.
