@@ -391,33 +391,37 @@ void main() {
   });
 
   group('the AI agent', () {
-    late KerabieCallController agent;
-    tearDown(() => agent.dispose());
+    KerabieCallController? agent;
+    // Not every test makes one.
+    tearDown(() {
+      agent?.dispose();
+      agent = null;
+    });
 
     KerabieCallController make(KerabieAgentOptions options) => agent = KerabieCallController.forChat(chat, media: media, agent: options);
 
-    test('sends the signed-in customer's token and the screens the app can show', () async {
+    test('sends the signed-in customer token and the screens the app can show', () async {
       make(KerabieAgentOptions(getUserToken: () async => 'jwt-abc', screens: {'confirm_action': (_) async => 'yes', 'pick_schedule': (_) async => 'x'}));
-      await agent.start();
+      await agent!.start();
       expect(chat.startTokens.single, 'jwt-abc');
       expect(chat.startTools.single, ['confirm_action', 'pick_schedule']);
     });
 
     test('sends no token when nobody is signed in, and when the token cannot be read', () async {
       make(KerabieAgentOptions(getUserToken: () async => null, screens: const {}));
-      await agent.start();
+      await agent!.start();
       expect(chat.startTokens.single, isNull);
-      agent.dispose();
+      agent!.dispose();
       chat.startTokens.clear();
       make(KerabieAgentOptions(getUserToken: () => throw StateError('storage'), screens: const {}));
-      await agent.start();
+      await agent!.start();
       expect(chat.startTokens.single, isNull);
     });
 
     test('hands the screens to the room when the call connects', () async {
       chat.onStart = (_) async => join(status: 'ACTIVE', handler: 'AI');
       make(KerabieAgentOptions(screens: {'confirm_action': (_) async => 'yes'}));
-      await agent.start();
+      await agent!.start();
       expect(media.joinedScreens.keys, ['confirm_action']);
     });
 
@@ -430,7 +434,7 @@ void main() {
           run: (args) async => 'added',
         ),
       }));
-      await agent.start();
+      await agent!.start();
       expect(chat.startActions.single, [
         {
           'name': 'add_to_cart',
@@ -447,6 +451,69 @@ void main() {
       expect(chat.startTokens.single, isNull);
       expect(chat.startTools.single, isEmpty);
       expect(chat.startActions.single, isEmpty);
+    });
+  });
+
+  group('one call at a time', () {
+    test('will not start a call while the app has another one', () async {
+      call.otherCallActive = true;
+      await call.start();
+      expect(chat.startCalls, isEmpty);
+      expect(call.phase, KerabieCallPhase.idle);
+      call.otherCallActive = false;
+      await call.start();
+      expect(chat.startCalls, hasLength(1));
+    });
+
+    test('ends a call in progress when the app answers another, and tells the server', () async {
+      chat.onStart = (_) async => join(status: 'ACTIVE', handler: 'AI');
+      await call.start();
+      expect(call.phase, KerabieCallPhase.connected);
+      call.otherCallActive = true;
+      await Future<void>.delayed(Duration.zero);
+      expect(call.phase, KerabieCallPhase.ended);
+      expect(call.endReason, 'other_call');
+      expect(chat.ended, [31]);
+      expect(media.leaves, greaterThan(0));
+    });
+
+    test('ends a call that is still ringing or waiting', () async {
+      await call.start();
+      expect(call.phase, KerabieCallPhase.ringing);
+      call.otherCallActive = true;
+      await Future<void>.delayed(Duration.zero);
+      expect(call.endReason, 'other_call');
+      expect(chat.ended, [31]);
+    });
+
+    test('closes the details form without calling anyone', () async {
+      chat.needsDetails = true;
+      await call.start();
+      expect(call.phase, KerabieCallPhase.details);
+      call.otherCallActive = true;
+      await Future<void>.delayed(Duration.zero);
+      expect(call.phase, KerabieCallPhase.idle);
+      expect(chat.ended, isEmpty);
+    });
+
+    test('ends a call that was still being placed when the other call started', () async {
+      final reply = Completer<KerabieCallJoin>();
+      chat.onStart = (_) => reply.future;
+      final starting = call.start();
+      await Future<void>.delayed(Duration.zero);
+      call.otherCallActive = true;
+      reply.complete(join());
+      await starting;
+      await Future<void>.delayed(Duration.zero);
+      expect(call.endReason, 'other_call');
+      expect(chat.ended, [31]);
+    });
+
+    test('does nothing when there is no call, and when the flag does not change', () async {
+      call.otherCallActive = true;
+      call.otherCallActive = true;
+      expect(call.phase, KerabieCallPhase.idle);
+      expect(chat.ended, isEmpty);
     });
   });
 }

@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:kerabie_helpdesk_flutter/kerabie_helpdesk_flutter.dart';
 import 'package:livekit_client/livekit_client.dart' show VideoTrack;
 
-import 'agent_options.dart';
 import 'call_media.dart';
 
 /// What the call controller needs from the chat. [KerabieController] is the real one; tests use a fake.
@@ -70,7 +69,7 @@ enum KerabieCallPhase {
 
 /// One call at a time: start it, follow it, hang up. Rebuilds listeners when anything changes.
 class KerabieCallController extends ChangeNotifier {
-  KerabieCallController(KerabieController chat, {KerabieCallMedia? media, this.agent})
+  KerabieCallController(KerabieController chat, {KerabieCallMedia? media, KerabieAgentOptions? agent})
       : this.forChat(KerabieControllerCalls(chat), media: media, agent: agent);
 
   KerabieCallController.forChat(this._chat, {KerabieCallMedia? media, this.agent}) : _media = media ?? LiveKitCallMedia() {
@@ -123,9 +122,41 @@ class KerabieCallController extends ChangeNotifier {
   VideoTrack? get remoteVideo => _media.remoteVideo;
   VideoTrack? get localVideo => _media.localVideo;
 
+  bool _otherCallActive = false;
+
+  /// True once your app has ANSWERED another call (Zego, Agora, CallKeep, your own LiveKit...). Two calls cannot share the
+  /// microphone, so a Kerabie call will not start while it is true, and one in progress ends when it becomes true. Set it
+  /// when the customer takes the other call, not while it only rings: let them choose first. Only your app can see its
+  /// other calls, so your app sets this.
+  bool get otherCallActive => _otherCallActive;
+  set otherCallActive(bool value) {
+    if (value == _otherCallActive) return;
+    _otherCallActive = value;
+    if (value && _phase != KerabieCallPhase.idle && _phase != KerabieCallPhase.ended) unawaited(_stepAside());
+    _notify();
+  }
+
+  /// The app's own call started: this one ends, so the microphone and the audio session are the other call's.
+  Future<void> _stepAside() async {
+    final id = _callId;
+    if (_phase == KerabieCallPhase.details) {
+      _reset(KerabieCallPhase.idle);
+      _notify();
+      return;
+    }
+    await _finish('other_call');
+    if (id != null) {
+      try {
+        await _chat.endCall(id);
+      } catch (_) {
+        // The server also closes the call when the room empties.
+      }
+    }
+  }
+
   /// Starts a call. A visitor who already has one is put back into it.
   Future<void> start({bool video = false}) async {
-    if (!available || _phase != KerabieCallPhase.idle) return;
+    if (!available || _otherCallActive || _phase != KerabieCallPhase.idle) return;
     _video = video && videoAvailable;
     // The organisation asks every visitor for details before a chat. A call asks the same, once.
     if (_chat.needsDetails) {
@@ -158,7 +189,11 @@ class KerabieCallController extends ChangeNotifier {
         appActions: agent == null ? const [] : agent.describeActions(),
       );
       // The call can end (the visitor cancels, nobody is free) before the reply to this request arrives.
-      if (_phase != KerabieCallPhase.starting) return;
+      if (_phase != KerabieCallPhase.starting) {
+        // The app's other call started while this one was being placed: the call just created must not be left open.
+        if (_endReason == 'other_call') unawaited(_chat.endCall(join.callId).catchError((_) {}));
+        return;
+      }
       await _apply(join);
     } on KerabieException catch (e) {
       _fail(e.message);
@@ -241,6 +276,11 @@ class KerabieCallController extends ChangeNotifier {
   Future<void> _apply(KerabieCallJoin join) async {
     _join = join;
     _callId = join.callId;
+    // The app's own call started while this one was being placed.
+    if (_otherCallActive) {
+      await _stepAside();
+      return;
+    }
     _video = join.video;
     _handler = join.handler ?? _handler;
     _queuePosition = join.queuePosition;

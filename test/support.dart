@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:kerabie_helpdesk_flutter/kerabie_helpdesk_flutter.dart';
-import 'package:kerabie_helpdesk_flutter_calls/src/agent_options.dart';
 import 'package:kerabie_helpdesk_flutter_calls/src/call_controller.dart';
 import 'package:kerabie_helpdesk_flutter_calls/src/call_media.dart';
 import 'package:livekit_client/livekit_client.dart' show VideoTrack;

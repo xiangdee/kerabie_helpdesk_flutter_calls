@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:kerabie_helpdesk_flutter/kerabie_helpdesk_flutter.dart';
 
-import 'agent_options.dart';
-import 'agent_screens.dart';
 import 'call_controller.dart';
 import 'call_screen.dart';
 
@@ -25,6 +23,7 @@ class KerabieAgentButton extends StatefulWidget {
     this.getUserToken,
     this.screens = const {},
     this.actions = const {},
+    this.otherCallActive = false,
   });
 
   /// The agent's name, on the button and the call screen.
@@ -42,6 +41,10 @@ class KerabieAgentButton extends StatefulWidget {
   /// What the app can do for the agent on the device, such as adding to the app's own cart or starting its checkout.
   final Map<String, KerabieAgentAction> actions;
 
+  /// True once your app has answered another call (not while it only rings). The button is disabled and a Kerabie call in
+  /// progress ends.
+  final bool otherCallActive;
+
   @override
   State<KerabieAgentButton> createState() => _KerabieAgentButtonState();
 }
@@ -52,13 +55,19 @@ class _KerabieAgentButtonState extends State<KerabieAgentButton> {
   bool _screenOpen = false;
 
   @override
+  void didUpdateWidget(KerabieAgentButton old) {
+    super.didUpdateWidget(old);
+    _call?.otherCallActive = widget.otherCallActive;
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final chat = KerabieProvider.of(context, listen: false);
     if (_chat != chat) {
       _call?.dispose();
       _chat = chat;
-      _call = KerabieCallController(chat, agent: _options());
+      _call = KerabieCallController(chat, agent: _options())..otherCallActive = widget.otherCallActive;
       _call!.resume().then((resumed) {
         if (resumed && mounted) _openScreen();
       });
@@ -109,7 +118,7 @@ class _KerabieAgentButtonState extends State<KerabieAgentButton> {
             minimumSize: const Size(0, 44),
             shape: const StadiumBorder(),
           ),
-          onPressed: call.phase == KerabieCallPhase.idle
+          onPressed: call.phase == KerabieCallPhase.idle && !call.otherCallActive
               ? () {
                   call.start();
                   _openScreen();

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
-import 'agent_options.dart';
+import 'package:kerabie_helpdesk_flutter/kerabie_helpdesk_flutter.dart' show KerabieAgentAction, KerabieScreenHandler;
 
 /// The audio and video side of a call. [LiveKitCallMedia] is the real one; tests use a fake.
 abstract class KerabieCallMedia {

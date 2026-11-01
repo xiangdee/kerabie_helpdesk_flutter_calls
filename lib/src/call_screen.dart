@@ -15,6 +15,7 @@ const _endedText = {
   'declined': 'Nobody was available to take your call. Please try again, or send us a message.',
   'limit': 'The call reached its time limit.',
   'connection_lost': 'The call was cut off. Please try again.',
+  'other_call': 'This call ended because another call started.',
 };
 
 String _clock(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';

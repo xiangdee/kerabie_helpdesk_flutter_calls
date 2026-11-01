@@ -119,6 +119,52 @@ To let the agent do things in the app itself, such as adding to its own cart, pa
 
 Each handler shows your screen and returns the customer's answer, which the agent reads back. Throw if the customer closes it. The agent only uses the screens you list. Addresses are never taken by voice. For your own design pass `KerabieAgentOptions(getUserToken:, screens:)` as `agent:` to `KerabieCallController`.
 
+## One call at a time
+
+Two calls cannot share the microphone, and only your app can see its other calls, so your app tells the package. Pass `otherCallActive` to `KerabieCallButton` and `KerabieAgentButton` (or set it on a `KerabieCallController`): true once the customer **answers** the other call, not while it only rings, so they choose first. A Kerabie call in progress then ends ("This call ended because another call started"), the buttons are disabled and a new call is refused. Set it back to false when the other call ends. A Kerabie call is never put on hold: a held call keeps running on Kerabie's side and the minutes count.
+
+If your app already uses LiveKit, reuse it: `livekit_client` must be 2.13 or newer. If it uses another calling or WebRTC plugin, tell your team before adding this package, because two WebRTC stacks can clash.
+
+## Wake the agent by saying its name
+
+```dart
+KerabieWakeWord(
+  name: 'Ted',                  // the agent's name
+  enabled: !inCall,             // never listen during a call
+  source: MySpeechSource(),     // your speech plugin, see below
+  onWake: startAgent,
+)
+```
+
+"Ted", "hi Ted", "hello Ted" and "hey Ted" all wake it, and small mishearings of a longer name are forgiven. It listens only while the app is open on screen, uses recognition that runs on the phone unless you pass `onDeviceOnly: false`, and listens again only after `enabled` has been false and true again. Offer it as a setting the customer turns on: the microphone is open while it listens, and the phone shows its microphone indicator.
+
+The package does not include a speech plugin, so apps that only want calls do not carry one. Implement `KerabieSpeechSource` around the plugin you use. An example with `speech_to_text` (check that plugin's current API, and add its microphone and speech permission strings):
+
+```dart
+class SttSource implements KerabieSpeechSource {
+  final _stt = SpeechToText();
+
+  @override
+  Future<KerabieSpeechStart> start({required String language, required bool onDeviceOnly, required void Function(String) onText, required void Function() onEnd, required void Function(String) onError}) async {
+    final ok = await _stt.initialize(
+      onError: (e) => onError(e.errorMsg),
+      onStatus: (s) { if (s == 'done' || s == 'notListening') onEnd(); },
+    );
+    if (!ok) return KerabieSpeechStart.denied;
+    if (onDeviceOnly && !await _stt.hasPermission) return KerabieSpeechStart.denied;
+    await _stt.listen(
+      localeId: language,
+      onResult: (r) => onText(r.recognizedWords),
+      listenOptions: SpeechListenOptions(onDevice: onDeviceOnly, partialResults: true),
+    );
+    return KerabieSpeechStart.started;
+  }
+
+  @override
+  Future<void> stop() => _stt.stop();
+}
+```
+
 ## How a call is handled
 
 If you ask customers for their details before a chat (the pre-chat form in the dashboard), the call asks the same questions first, once. Pass `user` in `KerabieConfig`, or call `setUser` after login, and a customer you have identified is never asked. On a video call the customer sees the agent, with their own camera as a small picture in the corner.
