@@ -1,3 +1,8 @@
+## 0.5.0
+
+- A person can ring the customer from the dashboard or the agent app. The call screen shows who is calling with Answer and Decline (`KerabieCallPhase.incoming`, `KerabieCallController.answer()` and `decline()`), and `KerabieCallButton` opens it by itself. Only while the app is open and online: there is no push or system call screen for the customer.
+- Needs `kerabie_helpdesk_flutter` 0.7.0 or newer.
+
 ## 0.4.0
 
 - Live voice with the AI agent and its orb, moved here from the separate `kerabie_helpdesk_flutter_voice` package (which is no longer needed): `KerabieVoiceScope`, `KerabieVoiceButton`, `KerabieVoiceController`, `KerabieOrb`. The speech goes over the chat connection, so it starts quicker than a call, and a panel at the bottom leaves the app usable.
