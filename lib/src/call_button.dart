@@ -46,6 +46,8 @@ class _KerabieCallButtonState extends State<KerabieCallButton> {
       _call?.dispose();
       _chat = chat;
       _call = KerabieCallController(chat)..otherCallActive = widget.otherCallActive;
+      // A person calling this customer brings the call screen up, so the ring is seen wherever the customer is.
+      _call!.addListener(_openOnIncoming);
       // A call that was going when the app was closed picks up again.
       _call!.resume().then((resumed) {
         if (resumed && mounted) _openScreen();
@@ -57,6 +59,10 @@ class _KerabieCallButtonState extends State<KerabieCallButton> {
   void dispose() {
     _call?.dispose();
     super.dispose();
+  }
+
+  void _openOnIncoming() {
+    if (_call?.phase == KerabieCallPhase.incoming && mounted) _openScreen();
   }
 
   Future<void> _openScreen() async {

@@ -21,6 +21,45 @@ void main() {
     chat.close();
   });
 
+  group('a person calls the customer', () {
+    test('rings, and answering joins the room', () async {
+      chat.emit('incoming', {'callId': 40, 'video': false, 'agentName': 'Jane'});
+      expect(call.phase, KerabieCallPhase.incoming);
+      expect(call.agentName, 'Jane');
+
+      await call.answer();
+      expect(chat.answered, [40]);
+      expect(call.phase, KerabieCallPhase.connected);
+      expect(media.joins, isNotEmpty);
+    });
+
+    test('declining ends the call on the server and goes back to idle', () async {
+      chat.emit('incoming', {'callId': 41, 'video': false, 'agentName': 'Jane'});
+      await call.decline();
+      expect(call.phase, KerabieCallPhase.idle);
+      expect(chat.ended, [41]);
+    });
+
+    test('a ring nobody answered ends quietly', () {
+      chat.emit('incoming', {'callId': 42, 'video': false, 'agentName': 'Jane'});
+      chat.emit('ended', {'callId': 42, 'reason': 'missed'});
+      expect(call.phase, KerabieCallPhase.idle);
+    });
+
+    test('is not offered while the customer is already in a call', () async {
+      await call.start();
+      chat.emit('incoming', {'callId': 43, 'video': false, 'agentName': 'Jane'});
+      expect(call.phase, isNot(KerabieCallPhase.incoming));
+      expect(call.callId, 31);
+    });
+
+    test('is not offered while the app has another call active', () {
+      call.otherCallActive = true;
+      chat.emit('incoming', {'callId': 44, 'video': false, 'agentName': 'Jane'});
+      expect(call.phase, KerabieCallPhase.idle);
+    });
+  });
+
   group('availability', () {
     test('follows the dashboard: calls and video', () {
       expect(call.available, isTrue);

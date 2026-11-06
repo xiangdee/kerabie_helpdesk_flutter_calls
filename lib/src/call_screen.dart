@@ -177,6 +177,22 @@ class _KerabieCallScreenState extends State<KerabieCallScreen> {
           palette: palette,
           onSubmit: call.submitDetails,
         );
+      case KerabieCallPhase.incoming:
+        final caller = call.agentName ?? 'Support';
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 48,
+              backgroundColor: palette.primary,
+              child: Text(caller.trim().isEmpty ? '?' : caller.trim()[0].toUpperCase(), style: TextStyle(color: palette.onPrimary, fontSize: 38, fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(height: 14),
+            Text(caller, style: strong()),
+            const SizedBox(height: 4),
+            Text(call.video ? 'is video calling you' : 'is calling you', style: quiet()),
+          ],
+        );
       case KerabieCallPhase.idle:
       case KerabieCallPhase.starting:
       case KerabieCallPhase.waiting:
@@ -204,6 +220,16 @@ class _KerabieCallScreenState extends State<KerabieCallScreen> {
   Widget _controls(KerabieCallController call, KerabiePalette palette) {
     if (call.phase == KerabieCallPhase.ended) {
       return _RoundButton(icon: Icons.close_rounded, label: 'Close', background: palette.primary, foreground: palette.onPrimary, onTap: call.dismiss);
+    }
+    if (call.phase == KerabieCallPhase.incoming) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _RoundButton(icon: Icons.call_end_rounded, label: 'Decline', background: _danger, foreground: Colors.white, onTap: call.decline),
+          const SizedBox(width: 44),
+          _RoundButton(icon: Icons.call_rounded, label: 'Answer', background: palette.primary, foreground: palette.onPrimary, onTap: call.answer),
+        ],
+      );
     }
     final connected = call.phase == KerabieCallPhase.connected;
     return Row(

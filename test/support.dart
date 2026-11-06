@@ -62,6 +62,15 @@ class FakeChat implements KerabieCallChat {
     return current;
   }
 
+  final answered = <int>[];
+  KerabieCallJoin? answerWith;
+
+  @override
+  Future<KerabieCallJoin> answerCall(int callId) async {
+    answered.add(callId);
+    return answerWith ?? join(status: 'ACTIVE', id: callId);
+  }
+
   @override
   Future<void> endCall(int callId) async {
     ended.add(callId);

@@ -12,6 +12,7 @@ abstract class KerabieCallChat {
   bool get videoEnabled;
   Future<KerabieCallJoin> startCall({bool video, String? userToken, List<String> uiTools, List<Map<String, dynamic>> appActions});
   Future<KerabieCallJoin?> currentCall();
+  Future<KerabieCallJoin> answerCall(int callId);
   Future<void> endCall(int callId);
   Stream<KerabieCallEvent> get callEvents;
 
@@ -36,6 +37,8 @@ class KerabieControllerCalls implements KerabieCallChat {
   @override
   Future<KerabieCallJoin?> currentCall() => controller.currentCall();
   @override
+  Future<KerabieCallJoin> answerCall(int callId) => controller.answerCall(callId);
+  @override
   Future<void> endCall(int callId) => controller.endCall(callId);
   @override
   Stream<KerabieCallEvent> get callEvents => controller.callEvents;
@@ -59,6 +62,9 @@ enum KerabieCallPhase {
 
   /// Free agents are being rung.
   ringing,
+
+  /// A person is calling this customer: [KerabieCallController.answer] or [KerabieCallController.decline].
+  incoming,
 
   /// Answered by a person or the AI: audio (and video) is flowing.
   connected,
@@ -216,6 +222,36 @@ class KerabieCallController extends ChangeNotifier {
     }
   }
 
+  /// Picks up a call a person started.
+  Future<void> answer() async {
+    final id = _callId;
+    if (_phase != KerabieCallPhase.incoming || id == null || _otherCallActive) return;
+    try {
+      final join = await _chat.answerCall(id);
+      if (_phase != KerabieCallPhase.incoming) return;
+      await _apply(join);
+    } on KerabieException catch (e) {
+      _fail(e.message);
+    } catch (_) {
+      _fail('Could not answer the call.');
+    }
+  }
+
+  /// Says no to a call a person started.
+  Future<void> decline() async {
+    final id = _callId;
+    if (_phase != KerabieCallPhase.incoming) return;
+    _reset(KerabieCallPhase.idle);
+    _notify();
+    if (id != null) {
+      try {
+        await _chat.endCall(id);
+      } catch (_) {
+        // The ring times out on its own.
+      }
+    }
+  }
+
   /// Ends the call, or cancels it before anyone answers.
   Future<void> hangUp() async {
     final id = _callId;
@@ -285,9 +321,13 @@ class KerabieCallController extends ChangeNotifier {
     _handler = join.handler ?? _handler;
     _queuePosition = join.queuePosition;
     // Somebody may have answered before the reply to the start request got here.
+    _agentName = join.agentName ?? _agentName;
     switch (_answeredEarly ? 'ACTIVE' : join.status) {
       case 'ACTIVE':
         await _connect();
+      case 'RINGING' when join.incoming:
+        _phase = KerabieCallPhase.incoming;
+        _notify();
       case 'RINGING':
         _phase = KerabieCallPhase.ringing;
         _notify();
@@ -320,6 +360,19 @@ class KerabieCallController extends ChangeNotifier {
   }
 
   void _onEvent(KerabieCallEvent event) {
+    // A person is calling: shown as a ring to answer or decline. Not while this customer is already in a call.
+    if (event.name == 'incoming') {
+      final id = event.callId;
+      if ((_phase == KerabieCallPhase.idle || _phase == KerabieCallPhase.ended) && id != null && !_otherCallActive) {
+        _reset(KerabieCallPhase.incoming);
+        _callId = id;
+        _video = event.data['video'] == true;
+        _handler = 'HUMAN';
+        _agentName = event.data['agentName'] as String?;
+        _notify();
+      }
+      return;
+    }
     if (_phase == KerabieCallPhase.idle) return;
     final id = event.callId;
     if (id != null && _callId != null && id != _callId) return;
@@ -342,7 +395,13 @@ class KerabieCallController extends ChangeNotifier {
           unawaited(_connect());
         }
       case 'ended':
-        unawaited(_finish(event.data['reason'] as String? ?? 'hangup'));
+        // A ring nobody answered ends quietly: nothing to report.
+        if (_phase == KerabieCallPhase.incoming) {
+          _reset(KerabieCallPhase.idle);
+          _notify();
+        } else {
+          unawaited(_finish(event.data['reason'] as String? ?? 'hangup'));
+        }
     }
   }
 
