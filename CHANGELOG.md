@@ -1,7 +1,7 @@
 ## 0.4.0
 
 - Live voice with the AI agent and its orb, moved here from the separate `kerabie_helpdesk_flutter_voice` package (which is no longer needed): `KerabieVoiceScope`, `KerabieVoiceButton`, `KerabieVoiceController`, `KerabieOrb`. The speech goes over the chat connection, so it starts quicker than a call, and a panel at the bottom leaves the app usable.
-- Needs `kerabie_helpdesk_flutter` 0.6.1 or newer. Adds the `record` and `flutter_pcm_sound` plugins.
+- Needs `kerabie_helpdesk_flutter` 0.7.0 or newer. Adds the `record` and `flutter_pcm_sound` plugins.
 
 ## 0.3.0
 

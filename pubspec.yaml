@@ -18,7 +18,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  kerabie_helpdesk_flutter: ^0.6.1
+  kerabie_helpdesk_flutter: ^0.7.0
   livekit_client: ^2.13.0
   record: ^6.0.0
   flutter_pcm_sound: ^3.0.0
