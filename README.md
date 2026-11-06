@@ -119,6 +119,31 @@ To let the agent do things in the app itself, such as adding to its own cart, pa
 
 Each handler shows your screen and returns the customer's answer, which the agent reads back. Throw if the customer closes it. The agent only uses the screens you list. Addresses are never taken by voice. For your own design pass `KerabieAgentOptions(getUserToken:, screens:)` as `agent:` to `KerabieCallController`.
 
+## Live voice with the AI agent and its orb
+
+Customers can talk to the AI agent live, with an orb that moves while they talk. It is quicker than a call (no room to join): the speech goes to Kerabie over the chat's own connection and the AI answers at once. A panel at the bottom of the screen shows the orb and what is being said, and leaves the app above it visible and usable, so the customer sees the app change as the AI opens screens and fills things in. The customer can speak over the AI and it stops. It uses the provider's `agent`, so the AI can use the same tools, screens and actions as in chat. It counts against the plan's **AI call minutes**.
+
+It needs the same microphone permission as calls. Echo cancelling and the microphone do not work on a simulator: test on a real device.
+
+Put a `KerabieVoiceScope` once near the root, inside `KerabieProvider`, and a `KerabieVoiceButton` wherever you want to start it:
+
+```dart
+MaterialApp(
+  navigatorKey: navigatorKey,
+  builder: (context, child) => KerabieVoiceScope(name: 'Kerabie Agent', child: child!),
+  home: const HomeScreen(),
+)
+
+// On your home screen, for example in a card:
+const KerabieVoiceButton(label: 'Talk to Kerabie Agent')
+```
+
+For your own button use `KerabieVoiceScope.of(context)`: `available`, `state`, `start()`, `stop()`, `setMuted()`. `KerabieVoiceButton` shows nothing when AI calls are off in the dashboard. Pass `otherCallActive: true` while your own call is going on, since two things cannot share the microphone.
+
+A session ends when the plan's AI minutes would run out, after 10 minutes, or after a minute of silence. An organisation can have 3 sessions at once.
+
+Built on [`record`](https://pub.dev/packages/record) (microphone, echo cancelling) and [`flutter_pcm_sound`](https://pub.dev/packages/flutter_pcm_sound) (speaker).
+
 ## One call at a time
 
 Two calls cannot share the microphone, and only your app can see its other calls, so your app tells the package. Pass `otherCallActive` to `KerabieCallButton` and `KerabieAgentButton` (or set it on a `KerabieCallController`): true once the customer **answers** the other call, not while it only rings, so they choose first. A Kerabie call in progress then ends ("This call ended because another call started"), the buttons are disabled and a new call is refused. Set it back to false when the other call ends. A Kerabie call is never put on hold: a held call keeps running on Kerabie's side and the minutes count.
