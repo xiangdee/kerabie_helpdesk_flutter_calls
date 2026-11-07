@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -153,13 +152,12 @@ class KerabieVoiceController extends ChangeNotifier {
 
   DateTime? _lastSpeech;
 
-  /// On Android the speech plays on the media channel, which the phone's echo canceller does not know about, so the
-  /// microphone picks the AI up and the AI takes it for the customer interrupting it, again and again. While the AI is
-  /// speaking (and a moment after, for what is still in the speaker's buffer) the AI is sent silence instead of the
-  /// microphone. The stream keeps flowing, so the session does not look idle. The cost: on Android the customer cannot
-  /// talk over the AI.
+  /// The speech plays through a different plugin from the microphone, so the phone's echo canceller has no reference for
+  /// it (seen on Android and on iPhone): the microphone picks the AI up, and the AI takes it for the customer interrupting
+  /// it, again and again. While the AI is speaking (and a moment after, for what is still in the speaker's buffer) the AI is
+  /// sent silence instead of the microphone. The stream keeps flowing, so the session does not look idle. The cost: the
+  /// customer cannot talk over the AI.
   bool _hearsItself() {
-    if (!Platform.isAndroid) return false;
     if (_state.activity == KerabieVoiceActivity.speaking) return true;
     final last = _lastSpeech;
     return last != null && DateTime.now().difference(last) < const Duration(milliseconds: 900);
