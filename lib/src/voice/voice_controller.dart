@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -115,6 +116,7 @@ class KerabieVoiceController extends ChangeNotifier {
         final pcm = e.data['pcm'];
         if (pcm is Uint8List) {
           _audio.play(pcm);
+          _lastSpeech = DateTime.now();
           levels.value = (input: levels.value.input, output: kerabiePcmLevel(pcm));
         }
       case 'voice_interrupted':
@@ -140,12 +142,27 @@ class KerabieVoiceController extends ChangeNotifier {
       if (!_running) return;
       _mic = mic.listen((pcm) {
         levels.value = (input: kerabiePcmLevel(pcm), output: levels.value.output);
-        if (!_state.muted) chat.voiceAudio(pcm);
+        if (_state.muted) return;
+        chat.voiceAudio(_hearsItself() ? Uint8List(pcm.length) : pcm);
       });
     } catch (_) {
       return _fail(KerabieVoiceError.unavailable);
     }
     _set(_state.ready());
+  }
+
+  DateTime? _lastSpeech;
+
+  /// On Android the speech plays on the media channel, which the phone's echo canceller does not know about, so the
+  /// microphone picks the AI up and the AI takes it for the customer interrupting it, again and again. While the AI is
+  /// speaking (and a moment after, for what is still in the speaker's buffer) the AI is sent silence instead of the
+  /// microphone. The stream keeps flowing, so the session does not look idle. The cost: on Android the customer cannot
+  /// talk over the AI.
+  bool _hearsItself() {
+    if (!Platform.isAndroid) return false;
+    if (_state.activity == KerabieVoiceActivity.speaking) return true;
+    final last = _lastSpeech;
+    return last != null && DateTime.now().difference(last) < const Duration(milliseconds: 900);
   }
 
   void setMuted(bool muted) => _set(_state.withMuted(muted));
